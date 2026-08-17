@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VetZhèn · Plataforma de Veterinária Integrativa </title>
+<title>VetZhèn · Plataforma de Veterinária Integrativa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -250,6 +250,30 @@
   .setup-screen pre{background:#1F2E2B;color:#DCE7E1;padding:14px 16px;border-radius:6px;font-family:'Montserrat';font-size:12.5px;overflow-x:auto;line-height:1.6;}
   .loading-screen{text-align:center;padding:80px 20px;color:var(--text-muted);font-size:14px;}
 
+  /* ---------- PRINT REPORT ---------- */
+  #print-report{display:none;}
+  .report-page{max-width:760px;margin:0 auto;padding:20px;color:#1c261c;font-family:'Montserrat',sans-serif;}
+  .report-header{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #496449;padding-bottom:14px;margin-bottom:18px;}
+  .report-header img{height:56px;}
+  .report-header-meta{text-align:right;font-size:12px;color:#555;}
+  .report-title{font-family:'PT Serif',serif;font-size:20px;font-weight:700;color:#32472F;margin:0 0 2px;}
+  .report-section{margin-bottom:16px;}
+  .report-section h3{font-family:'PT Serif',serif;font-size:14.5px;color:#32472F;border-bottom:1px solid #D9D2C2;padding-bottom:4px;margin:0 0 8px;}
+  .report-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:12.5px;}
+  .report-grid div span{color:#666;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:0.03em;}
+  .report-text{font-size:12.5px;line-height:1.6;white-space:pre-wrap;}
+  .report-session{border:1px solid #D9D2C2;border-radius:5px;padding:10px 12px;margin-bottom:8px;break-inside:avoid;font-size:12px;}
+  .report-session-head{display:flex;justify-content:space-between;font-weight:700;color:#32472F;margin-bottom:4px;}
+  .report-empty{color:#888;font-size:12px;font-style:italic;}
+  .report-footer{margin-top:26px;padding-top:10px;border-top:1px solid #D9D2C2;font-size:10.5px;color:#888;text-align:center;}
+
+  @media print{
+    body *{visibility:hidden;}
+    #print-report, #print-report *{visibility:visible;}
+    #print-report{display:block;position:absolute;left:0;top:0;width:100%;}
+    .toast{display:none !important;}
+  }
+
   /* ---------- LOGIN ---------- */
   .login-wrap{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:20px;}
   .login-card{background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);padding:36px 34px;width:100%;max-width:380px;}
@@ -287,6 +311,8 @@
   <svg class="pulse-divider" viewBox="0 0 1000 20" preserveAspectRatio="none" style="display:none" id="topDividerUnused"></svg>
   <div id="view-root"></div>
 </div>
+
+<div id="print-report"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -744,7 +770,7 @@ function renderList(){
   root.innerHTML = `
     <div class="section-eyebrow">Painel da equipe</div>
     <h1 class="page-title">Pacientes em acompanhamento</h1>
-    <p class="page-sub">Fichas de fisiatria, acupuntura e MVTC compartilhadas com toda a equipe de veterinárias da VetZhèn.</p>
+    <p class="page-sub">Fichas clínicas de veterinária integrativa compartilhadas com toda a equipe da VetZhèn.</p>
 
     <div class="stat-row">
       <div class="stat-card"><div class="stat-num">${index.length}</div><div class="stat-label">Pacientes cadastrados</div></div>
@@ -809,7 +835,10 @@ function renderForm(){
     <div class="patient-id-card">
       <div class="form-header">
         <div class="section-eyebrow">Ficha de atendimento · MVTC</div>
-        <span id="save-indicator" class="save-indicator saved">Sincronizado</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-ghost btn-small" id="btn-report">Gerar relatório (PDF)</button>
+          <span id="save-indicator" class="save-indicator saved">Sincronizado</span>
+        </div>
       </div>
       <div class="id-grid">
         ${idField('nome','Nome do animal','text', p.nome)}
@@ -840,6 +869,7 @@ function renderForm(){
   `;
 
   document.getElementById('back-btn').addEventListener('click', ()=>{ state.view='list'; render(); });
+  document.getElementById('btn-report').addEventListener('click', ()=>{ printReport(state.patient); });
   bindIdFields();
 
   const secRoot = document.getElementById('sections-root');
@@ -1134,6 +1164,71 @@ function bindNewSessionForm(){
     bindTratamento();
     showToast('Sessão registrada');
   });
+}
+
+/* ---------- Relatório para o tutor (PDF via impressão do navegador) ---------- */
+function printReport(p){
+  const logoSrc = (document.querySelector('.brand-logo') || {}).src || '';
+  const emitido = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+
+  const dados = [
+    ['Espécie', p.especie], ['Raça', p.raca], ['Sexo', p.sexo], ['Idade', p.idade],
+    ['Cor', p.cor], ['Tutor(a)', p.proprietario], ['Telefone', p.telefone], ['1ª avaliação', fmtDate(p.dataAvaliacao)],
+  ].filter(([,v])=>v);
+
+  const diagOcidental = p.data.diagnostico_ocidental;
+  const diagMvtc = p.data.diagnostico_mvtc;
+  const temDiagnostico = diagOcidental || diagMvtc;
+
+  const sessions = [...(p.sessions||[])].sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+  const sessionsHTML = sessions.length ? sessions.map(s=>`
+    <div class="report-session">
+      <div class="report-session-head"><span>Sessão ${s.numero} · ${fmtDate(s.data)}${s.hora?' · '+s.hora+'h':''}</span>${s.atendidoPor?`<span>${esc(s.atendidoPor)}</span>`:''}</div>
+      ${s.pontos ? `<div><strong>Pontos do tratamento:</strong> ${esc(s.pontos)}</div>` : ''}
+      ${s.modalidades && s.modalidades.length ? `<div><strong>Modalidades:</strong> ${s.modalidades.map(esc).join(', ')}</div>` : ''}
+      ${s.evolucao ? `<div style="margin-top:4px;"><strong>Evolução:</strong> ${esc(s.evolucao)}</div>` : ''}
+      ${(s.dor!==undefined && s.dor!=='') || (s.mobilidade!==undefined && s.mobilidade!=='') ? `<div style="margin-top:4px;">${s.dor!==''&&s.dor!==undefined?`Dor: ${s.dor}/10  `:''}${s.mobilidade!==''&&s.mobilidade!==undefined?`Mobilidade: ${s.mobilidade}/10`:''}</div>` : ''}
+    </div>`).join('') : '<div class="report-empty">Nenhuma sessão registrada.</div>';
+
+  const html = `
+    <div class="report-page">
+      <div class="report-header">
+        ${logoSrc ? `<img src="${logoSrc}" alt="VetZhèn">` : `<div class="report-title">VetZhèn</div>`}
+        <div class="report-header-meta">
+          <div class="report-title">Relatório de Atendimento</div>
+          Emitido em ${emitido}
+        </div>
+      </div>
+
+      <div class="report-section">
+        <h3>Paciente: ${esc(p.nome || 'Sem nome')}</h3>
+        <div class="report-grid">
+          ${dados.map(([label,val])=>`<div><span>${label}</span>${esc(val)}</div>`).join('')}
+        </div>
+      </div>
+
+      ${temDiagnostico ? `
+      <div class="report-section">
+        <h3>Diagnóstico</h3>
+        ${diagOcidental ? `<div class="report-text"><strong>Ocidental:</strong> ${esc(diagOcidental)}</div>` : ''}
+        ${diagMvtc ? `<div class="report-text" style="margin-top:6px;"><strong>MVTC:</strong> ${esc(diagMvtc)}</div>` : ''}
+      </div>` : ''}
+
+      <div class="report-section">
+        <h3>Perfil constitucional — Cinco Movimentos</h3>
+        ${radarSVG(p.movimentos, 190)}
+      </div>
+
+      <div class="report-section">
+        <h3>Histórico de sessões de tratamento (${sessions.length})</h3>
+        ${sessionsHTML}
+      </div>
+
+      <div class="report-footer">Documento gerado automaticamente pela plataforma VetZhèn — uso interno e compartilhamento com o(a) tutor(a) do paciente.</div>
+    </div>`;
+
+  document.getElementById('print-report').innerHTML = html;
+  setTimeout(()=> window.print(), 80);
 }
 
 boot();
